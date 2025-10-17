@@ -13,6 +13,8 @@ char    *WIFI_PASS[]     =    {"wave1234!",      "Bipul1000",   "pl5weeks"};
 #define NO_OF_SSID       3
 #define FIRST_ATTEMPT    0
 
+#define ADC_PIN 36  // ADC0 pin (GPIO36)
+
 //const char* scriptUrl = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
 const char* scriptUrl = "https://script.google.com/macros/s/AKfycbyYzT9mdTqFOnVeTqKmJ1XeuNuzjzpThmhrYpD-3vjwWo81IC_6Kelru70PwhMQQQKF/exec";//?sensor=232&value=2.3456";
 
@@ -62,7 +64,7 @@ void setup() {
 
 unsigned long long counter = 0;
 unsigned long long last_time = millis();
-
+String v_p2p = "__started__";
 void loop() {
   digitalWrite(LED, !digitalRead(LED));
   
@@ -71,9 +73,18 @@ void loop() {
 
   
   // Optional: add timed sending logic
-  sendData(String(counter++), getLocalTime());
+  Serial.println(v_p2p);
+  sendData(String(counter++), v_p2p); //getLocalTime());
   
-  while (millis()-last_time < 10000);
+  v_p2p = String(get_reading());
+  long t_ = millis();
+  while (millis() - last_time < 10000) {  // Run for 10 seconds
+    if (millis() - t_ >= 1000) {          // Every 1 second
+      v_p2p = v_p2p + ":" + String(get_reading());
+      t_ = millis();
+    }
+  }
+  
   last_time = millis();
 
 }
@@ -153,4 +164,28 @@ void connect_to_wifi(byte attemt)
     delay(100);
   }
   else connect_to_wifi((attemt+1) % NO_OF_SSID);
+}
+
+int get_reading(void){
+  unsigned long startTime = millis();
+  unsigned long startMicros = micros();
+  int minVal = 4095;   // 12-bit max range for ESP32 ADC
+  int maxVal = 0;
+  unsigned long lastSampleTime = micros();
+
+  // Run loop for 60 milliseconds
+  while (millis() - startTime < 60) {
+    unsigned long now = micros();
+
+    // Sample every 0.5 ms = 500 microseconds
+    if (now - lastSampleTime >= 500) {
+      lastSampleTime = now;
+      int adcVal = analogRead(ADC_PIN);
+
+      if (adcVal < minVal) minVal = adcVal;
+      if (adcVal > maxVal) maxVal = adcVal;
+    }
+  }
+
+  return maxVal - minVal;
 }
