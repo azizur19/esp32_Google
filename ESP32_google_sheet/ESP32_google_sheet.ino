@@ -7,15 +7,39 @@
 #define WDT_TIMEOUT 60  // Timeout in seconds (1 minute)
 #define LED         2
 
-const char* ssid = "Celestial Wave";
-const char* password = "wave1234!";
+
+char    *WIFI_SSID[]     =    {"Celestial Wave", "Durbol_WIFI", "Titumir"};    
+char    *WIFI_PASS[]     =    {"wave1234!",      "Bipul1000",   "pl5weeks"};
+#define NO_OF_SSID       3
+#define FIRST_ATTEMPT    0
+
 //const char* scriptUrl = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
 const char* scriptUrl = "https://script.google.com/macros/s/AKfycbyYzT9mdTqFOnVeTqKmJ1XeuNuzjzpThmhrYpD-3vjwWo81IC_6Kelru70PwhMQQQKF/exec";//?sensor=232&value=2.3456";
 
 // NTP server and timezone config
-const char* ntpServer = "pool.ntp.org";
+const char* ntpServer = "time.google.com";
 const long  gmtOffset_sec = 6 * 3600;   // for GMT+6 (Bangladesh)
 const int   daylightOffset_sec = 0;     // no daylight saving in BD
+const char* ntpServers[] = {
+  "pool.ntp.org",           // Global NTP pool
+  "time.google.com",        // Google NTP
+  "time.cloudflare.com",    // Cloudflare NTP
+  "time.windows.com",       // Microsoft NTP
+  "time.apple.com",         // Apple NTP
+  "time.nist.gov",          // U.S. National Institute of Standards
+  "ntp.ubuntu.com",         // Canonical/Ubuntu
+  "asia.pool.ntp.org",      // Asia regional pool
+  "europe.pool.ntp.org",    // Europe pool
+  "north-america.pool.ntp.org", // North America pool
+  "bd.pool.ntp.org",        // Bangladesh pool
+  "in.pool.ntp.org",        // India pool
+  "sg.pool.ntp.org",        // Singapore pool
+  "time1.google.com",       // Google load-balanced
+  "time2.google.com",       // Google load-balanced
+  "time3.google.com",       // Google load-balanced
+  "time4.google.com"        // Google load-balanced
+};
+
 
 
 void setup() {
@@ -25,13 +49,13 @@ void setup() {
   
   watch_dog_init();
 
-  connect_to_wifi();
+  connect_to_wifi(FIRST_ATTEMPT % NO_OF_SSID);
 
   watch_dog_reset();
 
 
     // Init and get time from NTP
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  config_time();
 
   sendData("Started_at", getLocalTime());
 }
@@ -43,7 +67,8 @@ void loop() {
   digitalWrite(LED, !digitalRead(LED));
   
   if (WiFi.status() != WL_CONNECTED)
-    connect_to_wifi();
+    connect_to_wifi(FIRST_ATTEMPT % NO_OF_SSID);
+
   
   // Optional: add timed sending logic
   sendData(String(counter++), getLocalTime());
@@ -55,15 +80,6 @@ void loop() {
 
 
 
-
-void connect_to_wifi(void){
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nConnected to WiFi: " + String(ssid));
-}
 
 
 void sendData(String sensor, String val) {
@@ -88,10 +104,15 @@ void sendData(String sensor, String val) {
   }
 }
 
+void config_time(void){
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+}
+
 String getLocalTime() {
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
+    config_time();
     return "0";
   }
 
@@ -111,4 +132,25 @@ void watch_dog_init(void){
 
 void watch_dog_reset(void){
   esp_task_wdt_reset();
+}
+
+void connect_to_wifi(byte attemt)
+{
+  Serial.println("\n\nConnecting to WiFi: " + String(WIFI_SSID[attemt])); 
+  WiFi.begin(WIFI_SSID[attemt], WIFI_PASS[attemt]);
+  
+  unsigned long last_t__ = millis();
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    digitalWrite(LED, !digitalRead(LED));
+    Serial.print(".");
+    delay(250);
+    if(millis()-last_t__ > 3e3) 
+      break;
+  }
+  if(WiFi.status() == WL_CONNECTED){
+    Serial.println("\n✅ Connected to WiFi: " + String(WIFI_SSID[attemt]) + "\nIP-Address is: " + WiFi.localIP().toString().c_str());
+    delay(100);
+  }
+  else connect_to_wifi((attemt+1) % NO_OF_SSID);
 }
